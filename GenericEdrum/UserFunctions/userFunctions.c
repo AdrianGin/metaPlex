@@ -47,7 +47,6 @@ THE SOFTWARE.
 #include "Sensor/sensor.h"
 #include "TimerCallbacks/TimerCallbacks.h"
 
-#include "ADC/adc12.h"
 #include "Profiles/profiles.h"
 #include "VUMeter/vumeter.h"
 #include "MenuSettings.h"
