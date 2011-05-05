@@ -18,11 +18,17 @@ const PROGRAM_CHAR VersionID[] = "USB-MIDI Bootloader V1.0";
 /* After 200 times to retry sending a message, we assume the USB is
    disconnected */
 #define USB_CONNECT_TIMEOUT (1500)
+#define CABLE_NO_COUNT (2)
 
-volatile uint8_t rxReadPtr;
+volatile uint8_t rxReadPtr[CABLE_NO_COUNT];
 uint8_t USB_Connected;
-volatile uint8_t RxBuffer[RX_BUFFER_SIZE];
-volatile uint8_t rxWritePtr;
+volatile uint8_t RxBuffer[CABLE_NO_COUNT][RX_BUFFER_SIZE];
+volatile uint8_t rxWritePtr[CABLE_NO_COUNT];
+
+usbMIDIcable_t MIDICable[2] = {
+      {.lastDataByte = NO_DATA_BYTE},
+      {.lastDataByte = NO_DATA_BYTE}
+};
 
 // This descriptor is based on http://www.usb.org/developers/devclass_docs/midi10.pdf
 // 
@@ -50,7 +56,7 @@ static PROGMEM char deviceDescrMIDI[] = {	/* USB device descriptor */
 static PROGMEM char configDescrMIDI[] = {	/* USB configuration descriptor */
 	9,			/* sizeof(usbDescrConfig): length of descriptor in bytes */
 	USBDESCR_CONFIG,	/* descriptor type */
-	101, 0,			/* total length of data returned (including inlined descriptors) */
+	103, 0,			/* total length of data returned (including inlined descriptors) */
 	2,			/* number of interfaces in this configuration */
 	1,			/* index of this configuration */
 	0,			/* configuration name string index */
@@ -128,26 +134,28 @@ static PROGMEM char configDescrMIDI[] = {	/* USB configuration descriptor */
 	6,			/* bLength */
 	36,			/* descriptor type */
 	2,			/* MIDI_IN_JACK desc subtype */
-	2,			/* EXTERNAL bJackType */
+	1,			/* External bJackType */
 	2,			/* bJackID */
 	0,			/* iJack */
+
 
 //B.4.4 MIDI OUT Jack Descriptor
 	9,			/* length of descriptor in bytes */
 	36,			/* descriptor type */
 	3,			/* MIDI_OUT_JACK descriptor */
 	1,			/* EMBEDDED bJackType */
-	3,			/* bJackID */
+	4,			/* bJackID */
 	1,			/* No of input pins */
 	2,			/* BaSourceID */
 	1,			/* BaSourcePin */
 	0,			/* iJack */
 
+
 	9,			/* bLength of descriptor in bytes */
 	36,			/* bDescriptorType */
 	3,			/* MIDI_OUT_JACK bDescriptorSubtype */
-	2,			/* EXTERNAL bJackType */
-	4,			/* bJackID */
+	1,			/* EMBEDDED bJackType */
+	5,			/* bJackID */
 	1,			/* bNrInputPins */
 	1,			/* baSourceID (0) */
 	1,			/* baSourcePin (0) */
@@ -167,11 +175,11 @@ static PROGMEM char configDescrMIDI[] = {	/* USB configuration descriptor */
 	0,			/* bSyncAddress */
 
 // B.5.2 Class-specific MS Bulk OUT Endpoint Descriptor
-	5,			/* bLength of descriptor in bytes */
+	6,			/* bLength of descriptor in bytes */
 	37,			/* bDescriptorType */
 	1,			/* bDescriptorSubtype */
-	1,			/* bNumEmbMIDIJack  */
-	1,			/* baAssocJackID (0) */
+	2,			/* bNumEmbMIDIJack  */
+	1, 2,		/* baAssocJackID (0) */
 
 
 //B.6 Bulk IN Endpoint Descriptors
@@ -187,11 +195,11 @@ static PROGMEM char configDescrMIDI[] = {	/* USB configuration descriptor */
 	0,			/* bSyncAddress */
 
 // B.6.2 Class-specific MS Bulk IN Endpoint Descriptor
-	5,			/* bLength of descriptor in bytes */
+	6,			/* bLength of descriptor in bytes */
 	37,			/* bDescriptorType */
 	1,			/* bDescriptorSubtype */
-	1,			/* bNumEmbMIDIJack (0) */
-	3,			/* baAssocJackID (0) */
+	2,			/* bNumEmbMIDIJack (0) */
+	4, 5,		/* baAssocJackID (0) */
 };
 
 
@@ -201,11 +209,11 @@ static PROGMEM char configDescrMIDI[] = {	/* USB configuration descriptor */
 ISR(SIG_UART_RECV)
 {
    uint8_t buffer = UDR;
-   //USBMIDI_PutByte(buffer);
+   //USBMIDI_PutByte(buffer, 1);
 
    /* Echo this back out */
-   RxBuffer[rxWritePtr] = buffer;
-   rxWritePtr = ((rxWritePtr + 1) & RX_BUFFER_MASK);
+   RxBuffer[0][rxWritePtr[0]] = buffer;
+   rxWritePtr[0] = ((rxWritePtr[0] + 1) & RX_BUFFER_MASK);
 }
 
 ISR(BADISR_vect, ISR_NOBLOCK)
@@ -311,16 +319,36 @@ uchar usbFunctionWrite(uchar * data, uchar len)
  
 void usbFunctionWriteOut(uchar * data, uchar len)
 {
-   uint8_t byteCount = 0;
-
    /* Route it all to the UART port at 31250 baud */
-   byteCount = usbMIDI_ParseData(data, len);
-   while(byteCount--)
+   uint8_t codeIndexNumber;
+   uint8_t messageSize = 0;
+   uint8_t cableNo = 0;
+   uint8_t i = 0;
+   uint8_t j = 0;
+
+   for( i = 0 ; i < len ; i = i + sizeof(usbMIDIMessage_t) )
+   {
+      if( data[i] )
+      {
+         codeIndexNumber = data[i] & (0x0F);
+         messageSize = FLASH_GET_PGM_BYTE(&MIDIResponseMap[codeIndexNumber]);
+         cableNo = data[i] >> 4;
+
+         for(j = 0; j < messageSize; j++)
+         {
+            uint8_t buffer = data[i+j+1];
+            RxBuffer[cableNo][rxWritePtr[cableNo]] = buffer;
+            rxWritePtr[cableNo] = ((rxWritePtr[cableNo] + 1) & RX_BUFFER_MASK);
+         }
+      }
+   }
+
+   /*while(byteCount--)
    {
       uint8_t buffer = *data++;
       RxBuffer[rxWritePtr] = buffer;
       rxWritePtr = ((rxWritePtr + 1) & RX_BUFFER_MASK);
-   }
+   }*/
 //   uartTxDump(data, byteCount);
 
 #if USB_CFG_HAVE_FLOWCONTROL
@@ -366,21 +394,22 @@ void usbFunctionWriteOut(uchar * data, uchar len)
  
 
 /* This reads the MIDI data received from USB */
-uint8_t USBMIDI_GetByte(void)
+uint8_t USBMIDI_GetByte(uint8_t* inByte, uint8_t cableNo)
 {
    /* Process messages in the UART Rx buffer is there are any */
-   if( rxReadPtr != rxWritePtr )
+   if( rxReadPtr[cableNo] != rxWritePtr[cableNo] )
    {
-      uint8_t nextByte = RxBuffer[rxReadPtr];
-      rxReadPtr = ((rxReadPtr + 1) & RX_BUFFER_MASK);
-      return nextByte;
+      *inByte = RxBuffer[cableNo][rxReadPtr[cableNo]];
+      rxReadPtr[cableNo] = ((rxReadPtr[cableNo] + 1) & RX_BUFFER_MASK);
+      return 1;
    }
 
    return NO_DATA_BYTE;
 }
 
+
 /* This here makes the process Buffer redundant */
-void USBMIDI_PutByte(uint8_t byte)
+void USBMIDI_PutByte(uint8_t byte, uint8_t cableNo)
 {
    uint8_t midiReady;
    uint16_t retry;
@@ -400,10 +429,12 @@ void USBMIDI_PutByte(uint8_t byte)
       }
    }
 
-   midiReady = MIDIDataReady(byte, &MIDImsgComplete[wMIDImsgCount]);
+   midiReady = MIDIDataReady(byte, &MIDICable[cableNo]);
    /* Copy it out, so the tempbuffer is ready again */
    if( midiReady == MIDI_DATA_READY)
    {
+      memcpy(&MIDImsgComplete[wMIDImsgCount], &MIDICable[cableNo].msg, sizeof(usbMIDIMessage_t));
+	  MIDImsgComplete[wMIDImsgCount].header = MIDImsgComplete[wMIDImsgCount].header | (cableNo << 4);
       wMIDImsgCount = (wMIDImsgCount + 1) & MIDI_OUT_MASK;
    }
 }
@@ -565,11 +596,11 @@ void bootloader_enter(void)
    while(1)
    {
       usbPoll();
-      nextByte = USBMIDI_GetByte();
-      if( nextByte != NO_DATA_BYTE )
+      if( USBMIDI_GetByte(&nextByte, 0) != NO_DATA_BYTE)
       {
          ParseFirmwareData(nextByte);
       }
+      USBMIDI_OutputData();
    }
 }
 

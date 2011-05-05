@@ -27,7 +27,8 @@ void bootloader_leave(void);
 void bootuartTxString_P(PGM_P outString_P);
 void bootuartTx(uint8_t outbyte);
 
-void USBMIDI_PutByte(uint8_t byte);
+uint8_t USBMIDI_GetByte(uint8_t* inByte, uint8_t cableNo);
+void USBMIDI_PutByte(uint8_t byte, uint8_t cableNo);
 void USBMIDI_EnableRequests(void);
 void USBMIDI_ProcessBuffer(void);
 void USBMIDI_OutputData(void);

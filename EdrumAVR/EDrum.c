@@ -98,6 +98,8 @@ volatile uint8_t PrintChannel;
 int main(void)
 {
 
+	volatile haha = PROFILE(0);
+    volatile haha2 = APP_END;
 
    DDRD &= ~(1 << 3);
    PORTD &= ~(1<<3);
@@ -208,8 +210,8 @@ int main(void)
           * We do not wish to disable the PlayMode during
           * USB_MIDI_THRU mode */
          case USB_MIDI_THRU:
-            inByte = USBMIDI_GetByte();
-            if( inByte != NO_DATA_BYTE )
+            
+            if( USBMIDI_GetByte(&inByte, EXTERNAL_MIDI_CABLE) != NO_DATA_BYTE )
             {
                UART_Tx(inByte);
             }
@@ -251,8 +253,8 @@ int main(void)
 
 
          case RECEIVE_SYSEX:
-            inByte = USBMIDI_GetByte();
-            if(inByte != NO_DATA_BYTE)
+            
+            if(USBMIDI_GetByte(&inByte, EDRUM_MIDI_CABLE) != NO_DATA_BYTE)
             {
                ringbuffer_put( (RINGBUFFER_T*)&ReceiveBuffer, inByte);
             }
@@ -412,7 +414,7 @@ ISR(USART_RXC_vect)
       break;
 
       case USB_MIDI_THRU:
-         USBMIDI_PutByte(buffer);
+         USBMIDI_PutByte(buffer, EXTERNAL_MIDI_CABLE);
       break;
    }
 }
