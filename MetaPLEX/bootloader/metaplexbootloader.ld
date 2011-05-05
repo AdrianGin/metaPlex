@@ -1,0 +1,7 @@
+SECTIONS
+{
+  .jumps :
+   {
+     KEEP(*(.jumps))
+    }
+}
