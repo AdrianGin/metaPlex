@@ -7,9 +7,9 @@
 
 #include "flashmem/lowlevel_flashmem.h"
 
-static uint32_t firmwareDataCount;
-static uint32_t firmwareByteCount;
-static uint32_t firmwareAddress;
+uint32_t firmwareDataCount;
+uint32_t firmwareByteCount;
+uint32_t firmwareAddress;
 
 /* Erase pages as we go */
 void FirmwareCheckForErase(uint32_t address)
@@ -74,6 +74,9 @@ void ParseFirmwareData(uint8_t nextByte)
       break;
 
       case 3:
+         data = 0;
+         firmwareData[0] = 0;
+         firmwareData[1] = 0;
          //ReceiveFirmwareInit();
       break;
 

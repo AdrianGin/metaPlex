@@ -169,7 +169,7 @@ void usbPoll(void)
 	   uint8_t cableNo = 0;
 	   uint8_t j = 0;
 
-	   PORTD ^= (1 << MIDI_IN_LED);
+	   PORTD ^= (1 << MIDI_IN_LED_RED);
 	   data = (uint8_t*)&ReceivedMIDIEvent;
 
 		codeIndexNumber = data[0] & (0x0F);
@@ -200,15 +200,13 @@ void USBMIDI_OutputData(void)
     while( usbMIDI_bufferLen() )
     {
         uint8_t* data = (uint8_t*)&MIDImsgComplete[rMIDImsgCount];
-		for(uint8_t j = 0; j < 4; j++)
-		{
-			bootuartTx(data[j]);
-		}
 
 		MIDI_Device_SendEventPacket(&MIDI_Interface, (MIDI_EventPacket_t*)&MIDImsgComplete[rMIDImsgCount]);
 		rMIDImsgCount = (rMIDImsgCount + 1) & MIDI_OUT_MASK;
 
-		PORTD ^= (1 << MIDI_OUT_LED);
+		PORTD ^= (1 << MIDI_OUT_LED_RED);
+        MIDI_Device_USBTask(&MIDI_Interface);
+	    USB_USBTask();
     }    
 }
 
@@ -251,8 +249,6 @@ void bootloader_init(void)
    /* Columns as outputs */  
    UI_COL_DIR |= (UI_COLS);
    UI_COL_OUT &= ~(UI_COLS); 
-
-   DDRD |= ((1 << MIDI_IN_LED) | (1 << MIDI_OUT_LED));
 }
 
 
@@ -271,14 +267,13 @@ void bootloader_enter(void)
    MCUCR = (1 << IVCE);
    MCUCR = (1 << IVSEL);  
 
-   
-   //DDRD |= (1 << 7);
+   DDRD |= ((1 << MIDI_IN_LED_GREEN) | (1 << MIDI_IN_LED_RED) | (1 << MIDI_OUT_LED_RED) | (1 << MIDI_OUT_LED_GREEN));
 
+   //DDRD |= (1 << 7);
    boot_lock_bits_set ((1<<BLB11));
    
-   usbInit();
    bootuartInit();
-   UBRR1L = 31;
+   UBRR1L = BAUD(31250);
    sei();
 
    bootuartTxString_P(PSTR("Welcome to "));
@@ -288,6 +283,9 @@ void bootloader_enter(void)
    bootuartTxString_P(PSTR("by FuzzyJohn Inc. 2011"));
 
    uint8_t nextByte;
+   firmwareDataCount = 0;
+   firmwareByteCount = 0;
+   firmwareAddress = 0;
 
    while(1)
    {
@@ -302,14 +300,18 @@ void bootloader_enter(void)
 
 int main(void)
 {
+
+   MCUSR = 0;
+   wdt_disable();
+
    MCUCR = (1 << JTD);
    MCUCR = (1 << JTD);
    bootloader_init();
-   wdt_disable();
 
    /* If bootloader condition */
    if( BOOTLOADER_CONDITION )
    {  
+      usbInit();
       bootloader_enter();
    }
    else

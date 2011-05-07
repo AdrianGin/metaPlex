@@ -95,7 +95,7 @@ uint8_t IsReceivingSysExData(uint8_t state)
 
 void ParseSysExData(uint8_t nextByte)
 {
-   
+   //UART_Tx(nextByte);
    uint8_t* profilePtr;
    
    /* data is sent as 2x 7 bit bytes, so the first byte needs to be stored */
@@ -106,15 +106,15 @@ void ParseSysExData(uint8_t nextByte)
       case 0:
          if( nextByte != MIDI_SYSEX_START )
          {
-            SysEx_ReceiveError();
             return;
-         }         
+         }
+
       break;   
       
       case 1:
          if( nextByte != MIDI_MANUFACTURER )
          {
-            SysEx_ReceiveError();
+            SysEx_ReceiveError(BAD_MANUFACTURER_ID);
             return;
          }   
       break;
@@ -122,7 +122,7 @@ void ParseSysExData(uint8_t nextByte)
       case 2:
          if( nextByte != MIDI_DEVICE_CODE )
          {
-            SysEx_ReceiveError();
+            SysEx_ReceiveError(BAD_DEVICE_ID);
             return;
          }
       break;
@@ -135,6 +135,12 @@ void ParseSysExData(uint8_t nextByte)
    
    profilePtr = (uint8_t*)&CurrentProfile;
    
+   if( (DataCount > (sizeof(Profile_t)*2) + 3) )
+   {
+      SysEx_ReceiveError(SYSEX_TOO_LARGE);
+      return;
+   }
+
    if( DataCount >= 3 )
    {
       
@@ -182,16 +188,11 @@ void ParseSysExData(uint8_t nextByte)
          }
          else
          {
-            SysEx_ReceiveError();
+            SysEx_ReceiveError(SYSEX_TOO_SMALL);
             return;
          }
       }
-      
-      if( (DataCount >  (sizeof(Profile_t)*2) + 3) )
-      {
-         SysEx_ReceiveError();
-         return;
-      }
+
       
       /* Check if Datacount is odd */    
       if( !((DataCount - 3) & 0x01) )
@@ -211,14 +212,24 @@ void ParseSysExData(uint8_t nextByte)
    DataCount++;
 }
 
-void SysEx_ReceiveError(void)
+void SysEx_ReceiveError(uint8_t errorCode)
 {
    uint8_t i;
+   uint8_t outputString[3];
    
+
+ 
+   primaryMenu.MenuPrint_P( PSTR("Read Error: ("));
+   utoa(errorCode, outputString, 10);
+   primaryMenu.MenuPrint(outputString);
+   primaryMenu.MenuPrint(")");
+   primaryMenu.MenuNewLine();
+   primaryMenu.MenuPrint_P( PSTR("Count:"));
+   utoa(DataCount, outputString, 10);
+   primaryMenu.MenuPrint(outputString);
+
    SysExFlush();
    IsReceivingSysExData(SYSEX_DATA_ERROR);
- 
-   primaryMenu.MenuPrint_P( PSTR("Invalid Data!"));
    
    for( i = 0; i < 5; i++ )
 	{	

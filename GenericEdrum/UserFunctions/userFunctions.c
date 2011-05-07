@@ -491,6 +491,10 @@ void GetSysEx(void* data)
 		}	
 	}
 	SysExFlush();
+	while( ringbuffer_len((RINGBUFFER_T*)&ReceiveBuffer) )
+	{
+	   ringbuffer_get((RINGBUFFER_T*)&ReceiveBuffer);
+	}
    ActiveProcess = RECEIVE_SYSEX;
    
    /* Stop the Auxuliary Timer */

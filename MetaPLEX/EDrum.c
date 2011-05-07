@@ -22,11 +22,13 @@
 #include "edrumAVRsharedfunctions.h"
 #include "USBMIDI/USBMIDI.h"
 
+
+#include <avr/wdt.h>
 #include <stdlib.h>
 #include <util/crc16.h>
 
 
-const prog_char VersionId[] = "1.6 22/03/11";
+const prog_char VersionId[] = "1.0 07/05/11";
 
 uint16_t BenchMarkCount = 0;
 
@@ -75,43 +77,33 @@ volatile uint8_t PrintChannel;
 int main(void)
 {
 
-   //DDRD &= ~(1 << 3);
-   //PORTD &= ~(1<<3);
-
-    volatile haha2 = APP_END;
+   MCUSR = 0;
+   wdt_disable();
 
    MCUCR = (1 << JTD);
    MCUCR = (1 << JTD);
 
+   DDRD |= ((1 << MIDI_IN_LED_GREEN) | (1 << MIDI_IN_LED_RED) | (1 << MIDI_OUT_LED_RED) | (1 << MIDI_OUT_LED_GREEN));
 
    /* Setup the USB */
+   usbInit();
+
    sei();
-   //usbInit();
+
    SoftTimer_TimerInit();
-   //SoftTimerStart( SoftTimer2[SC_usbPoll] );
+   SoftTimerStart( SoftTimer1[SC_usbPoll] );
    
    /* Setup the communications module */   
    UART_Init(0);
-   UART_SetBaud(0,39);
+   UART_SetBaud(0,BAUD(31250));
    
-   //SPI_Init();
    /* Enable LCD */
-   _delay_ms(50);
+   _delay_ms(100);
    UI_LCD_HWInit();
-   _delay_ms(30);
-   /* Enable Keypad */
-   UI_KP_Init();
-   ENABLE_KEYPAD();   
-	
+   _delay_ms(100);
+ 
 	/* Menu must be Initialised first */
-	/* Backlight 'off' is at 5% */
-   //UI_LCD_BLInit(5);
-   //UI_LCD_BL_On();
-
    UI_LCD_Init(&PrimaryDisplay);
-
-   LCD_BL_DDR |= (1 << LCD_BL_PIN);
-   LCD_BL_PORT |= (1 << LCD_BL_PIN);
 
    /* Menu Display Init */
    MenuSetDisplay(&primaryMenu, MENU_LCD);
@@ -120,12 +112,12 @@ int main(void)
    MenuSetDisplay(&dualTrigMenu, MENU_LCD);   
 
 
-   /*if( VerifyDownload() == 0)
+   if( VerifyDownload() == 0)
    {  
       Shutdown();
       cli();
       bootloader_enter();
-   }*/
+   }
    
    ProfileInit();   
    /* Make profile 1 the default profile on start up */
@@ -161,33 +153,78 @@ int main(void)
    /* Reprint Menu */
    MenuUpdate(&primaryMenu, RESET_MENU);   
 
-   /*Activate Interrupt */
-   //MCUCR |= ((1 << ISC11) | (1 << ISC10));
-   //GICR |= (1 << INT1);
+   /* Enable Keypad */
+   UI_KP_Init();
+   ENABLE_KEYPAD();  
 
    /* Flush the buffer */
    //Callback_Keypress();
 
-   //SoftTimerStop(SoftTimer2[SC_usbPoll]);
-   //SoftTimerStart(SoftTimer1[SC_MIDIScan]);
-   sei();
+   SoftTimerStop(SoftTimer1[SC_usbPoll]);
+   SoftTimerStart(SoftTimer1[SC_MIDIScan]);
 
    uint8_t inByte;
+   uint16_t sysExCount = 0;
+
    while (1)
    {   
       switch( ActiveProcess )
             {
                case PLAY_MODE:
-                  //if( SoftTimerIsEnabled(SoftTimer1[SC_MIDIScan]) )
+                  if( SoftTimerIsEnabled(SoftTimer1[SC_MIDIScan]) )
                   {
                      Play();
                   }
                break;
+
+               case SENDING_SYSEX:
+                   if(sysExCount == (sizeof(Profile_t)+3) )
+                   {
+                      sysExCount = SEND_SYSEX_STOP;
+                   }
+                   SysExSendNextByte(&CurrentProfile, sysExCount++);
+                   /* Send the header and sysex end bytes */
+                   if( sysExCount == SEND_SYSEX_STOP+1)
+                   {
+                      sysExCount = 0;
+                      SoftTimerStart(SoftTimer1[SC_MIDIScan]);
+                      UF_MenuPrint_P( PSTR("Profile sucessfully"));
+                      UF_MenuNewLine();
+                      UF_MenuPrint_P( PSTR("uploaded!") );
+                      delayWithUSBPoll(8, 0);
+                      UF_MenuUpOneLevel(&primaryMenu);
+                      MenuUpdate(ActiveMenu, NO_EXECUTE);
+                      ActiveProcess = DEFAULT_PROCESS;
+                   }
+
+                break;
+
+
+                case RECEIVE_SYSEX:
+                   while(USBMIDI_GetByte(&inByte, EDRUM_MIDI_CABLE) != NO_DATA_BYTE)
+                   {
+                      ringbuffer_put( (RINGBUFFER_T*)&ReceiveBuffer, inByte);
+                   }
+
+                   while( ringbuffer_len((RINGBUFFER_T*)&ReceiveBuffer)  )
+                   {
+                      
+                      ParseSysExData(ringbuffer_get((RINGBUFFER_T*)&ReceiveBuffer));
+                   }
+                break;
+
+               case FIRMWARE_UPGRADE:
+                  Shutdown();
+                  bootloader_enter();
+               break;
             }
 
+      usbPoll();
+      USBMIDI_OutputData();
+
+
    }
-         //usbPoll();
-      //USBMIDI_OutputData();
+      
 
    return 0;
 
@@ -252,11 +289,7 @@ uint8_t VerifyDownload(void)
    
 
    if( crc != appCRC )
-   {
-      //UI_LCD_String_P(&PrimaryDisplay, PSTR("  DOWNLOAD FAILED!") );
-      //UI_LCD_String_P(&PrimaryDisplay, PSTR("IF DOWNLOAD FAILS:") );
-   	//UI_LCD_String_P(&PrimaryDisplay, PSTR("  **HOLD ANY KEY**") );
-   	//UI_LCD_String_P(&PrimaryDisplay, PSTR("CYCLE POWER & RETRY") );        
+   {        
       //sei();
       FirmwareInstructions(DOWNLOAD_FAILED);
       return 0;
@@ -265,6 +298,50 @@ uint8_t VerifyDownload(void)
    return 1; // must be 0
 }
 
+
+
+// This must be declared "naked" because we want to let the
+// bootloader function handle all of the register push/pops
+// and do the RETI to end the handler.
+void USB_GEN_vect(void) __attribute__((naked));
+ISR(USB_GEN_vect, ISR_NOBLOCK)
+{
+    asm("jmp 0xe028");
+}
+
+
+
+
+ISR(USART1_RX_vect)
+{
+   uint8_t buffer;
+   buffer = UDR1;
+   sei();
+
+/* Echo the data back out */
+   //USBMIDI_PutByte(buffer);
+   //uartTx(buffer);
+
+   switch( ActiveProcess )
+   {
+      case PLAY_MODE:
+         //UART_Tx(buffer);
+         //PrintChannel = buffer -'0';
+      break;
+      
+      case RECEIVE_SYSEX:
+         ringbuffer_put( (RINGBUFFER_T*)&ReceiveBuffer, buffer);
+      break;
+
+      case FIRMWARE_UPGRADE:
+//         ParseFirmwareData(buffer);
+      break;
+
+      case USB_MIDI_THRU:
+         USBMIDI_PutByte(buffer, EXTERNAL_MIDI_CABLE);
+      break;
+   }
+}
 
 ISR(USART1_TX_vect, ISR_NOBLOCK)
 {

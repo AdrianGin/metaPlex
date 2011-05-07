@@ -43,9 +43,9 @@ THE SOFTWARE.
 #include "mmculib/uint8toa.h"
 
 static char txbuffer[TXBUFFER_SIZE];
-RINGBUFFER_T TransmitBuffer = {txbuffer, sizeof(txbuffer)};
+volatile RINGBUFFER_T TransmitBuffer = {txbuffer, sizeof(txbuffer)};
 static char rxbuffer[RXBUFFER_SIZE];
-RINGBUFFER_T ReceiveBuffer = {rxbuffer, sizeof(rxbuffer)};
+volatile RINGBUFFER_T ReceiveBuffer = {rxbuffer, sizeof(rxbuffer)};
 
 volatile uint8_t transmitState;
 

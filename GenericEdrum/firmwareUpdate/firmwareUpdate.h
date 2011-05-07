@@ -10,6 +10,10 @@
 #define	RECEIVE_COMPLETE_BIT	RXC
 #define	UART_DATA_REG	UDR
 
+extern uint32_t firmwareDataCount;
+extern uint32_t firmwareByteCount;
+extern uint32_t firmwareAddress;
+
 void ReceiveFirmwareInit(void);
 void FirmwareUpdateError(void);
 void ParseFirmwareData(uint8_t nextByte);

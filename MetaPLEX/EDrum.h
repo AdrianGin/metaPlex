@@ -26,6 +26,10 @@ enum {
    USB_MIDI_THRU,
 } processes;
 
+
+#define EDRUM_MIDI_CABLE    (0)
+#define EXTERNAL_MIDI_CABLE   (1)
+
 #if PROFILE_MEMORY == PROFILE_EEPROM
    #define APP_END (FLASH_TEMP_BUFFER - 1)
 #else

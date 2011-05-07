@@ -35,8 +35,10 @@
 #define MIDI_BAUD_115200		MIDI_BAUD(115200)
 #define MIDI_BAUD_1M			MIDI_BAUD(1000000)
 
-#define MIDI_IN_LED	(4)
-#define MIDI_OUT_LED (6)
+#define MIDI_IN_LED_GREEN	(4)
+#define MIDI_IN_LED_RED  (5)
+#define MIDI_OUT_LED_GREEN (6)
+#define MIDI_OUT_LED_RED (7)
 
 /* SPI Defines */
 #define SPI_DDR   (DDRB)
@@ -283,7 +285,7 @@ extern AVR_USART_t PrimaryUART;
 #define FLASH_GET_PGM_WORD(address) pgm_read_word(address)
 #define FLASH_GET_PGM_BYTE(address) pgm_read_byte(address)
 
-#define JUMP_TABLE_LOCATION (0x7FC0)
+#define JUMP_TABLE_LOCATION (0xFFC0)
 
 #define FLASH_PROGRAMMING_ENTER  (1)
 #define FLASH_PROGRAMMING_EXIT  (0)

@@ -34,11 +34,21 @@ THE SOFTWARE.
 #define RECEIVING_SYSEX_DATA (1)
 #define SYSEX_DATA_ERROR (3)
 
+enum {
+
+   BAD_START_BYTE = 0,
+   BAD_MANUFACTURER_ID,
+   BAD_DEVICE_ID,
+   SYSEX_TOO_SMALL,
+   SYSEX_TOO_LARGE,
+
+} errorCodes;
+
 void SysExSendNextByte(void* data, uint16_t count);
 uint8_t IsReceivingSysExData(uint8_t state);
 void ParseSysExData(uint8_t nextByte);
 void SysExFlush(void);
-void SysEx_ReceiveError(void);
+void SysEx_ReceiveError(uint8_t errorCode);
 
 
 #endif
