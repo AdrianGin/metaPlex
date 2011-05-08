@@ -58,7 +58,7 @@
 #define CLEAR_KEYPAD()              PCIFR = (1 << PCIF0)
 
 /* Uart Defines */
-extern AVR_USART_t PrimaryUART;
+extern volatile AVR_USART_t PrimaryUART;
 #define UART_Init(x)            uartInit(&PrimaryUART, x)
 #define UART_SetBaud(high, low) uartSetBaud(&PrimaryUART, high, low)
 #define UART_Tx(x)              uartTx(&PrimaryUART, x)

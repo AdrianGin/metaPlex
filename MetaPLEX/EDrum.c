@@ -170,6 +170,13 @@ int main(void)
    {   
       switch( ActiveProcess )
             {
+
+               case USB_MIDI_THRU:
+                  while(USBMIDI_GetByte(&inByte, EXTERNAL_MIDI_CABLE) != NO_DATA_BYTE)
+                  {
+                     UART_Tx(inByte);
+                  }
+
                case PLAY_MODE:
                   if( SoftTimerIsEnabled(SoftTimer1[SC_MIDIScan]) )
                   {
@@ -203,13 +210,13 @@ int main(void)
                 case RECEIVE_SYSEX:
                    while(USBMIDI_GetByte(&inByte, EDRUM_MIDI_CABLE) != NO_DATA_BYTE)
                    {
-                      ringbuffer_put( (RINGBUFFER_T*)&ReceiveBuffer, inByte);
+                      ringbuffer_put( (RINGBUFFER_T*)PrimaryUART.ReceiveBuffer, inByte);
                    }
 
-                   while( ringbuffer_len((RINGBUFFER_T*)&ReceiveBuffer)  )
+                   while( ringbuffer_len((RINGBUFFER_T*)PrimaryUART.ReceiveBuffer)  )
                    {
-                      
-                      ParseSysExData(ringbuffer_get((RINGBUFFER_T*)&ReceiveBuffer));
+                      uint8_t byte = ringbuffer_get((RINGBUFFER_T*)PrimaryUART.ReceiveBuffer);
+                      ParseSysExData(byte);
                    }
                 break;
 
@@ -330,7 +337,7 @@ ISR(USART1_RX_vect)
       break;
       
       case RECEIVE_SYSEX:
-         ringbuffer_put( (RINGBUFFER_T*)&ReceiveBuffer, buffer);
+         ringbuffer_put( (RINGBUFFER_T*)PrimaryUART.ReceiveBuffer, buffer);
       break;
 
       case FIRMWARE_UPGRADE:

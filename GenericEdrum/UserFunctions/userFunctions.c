@@ -62,7 +62,9 @@ static uint8_t SelectedProfile = PROFILE_1;
 uint8_t SelectedChannel;
 char outputString[21];
 
-
+/* Delays for the specified time in 100ms blocks,
+ *
+ */
 void delayWithUSBPoll(uint8_t hundredms, uint8_t withDots)
 {
    uint8_t i;
@@ -278,11 +280,11 @@ void DisableEdrum(void* data)
          case KP_A:
             if( SoftTimerIsEnabled(SoftTimer1[SC_MIDIScan]) )
             {
-               SoftTimer1[SC_MIDIScan].timerEnable = 0;
+               SoftTimerStop(SoftTimer1[SC_MIDIScan]);
             }
             else
             {
-               SoftTimer1[SC_MIDIScan].timerEnable = 1;
+               SoftTimerStart(SoftTimer1[SC_MIDIScan]);
             }
             break;
          
@@ -493,8 +495,10 @@ void GetSysEx(void* data)
 	SysExFlush();
 	while( ringbuffer_len((RINGBUFFER_T*)&ReceiveBuffer) )
 	{
+	   PORTD ^= (1 << 7);
 	   ringbuffer_get((RINGBUFFER_T*)&ReceiveBuffer);
 	}
+	SoftTimerStop(SoftTimer1[SC_MIDIScan]);
    ActiveProcess = RECEIVE_SYSEX;
    
    /* Stop the Auxuliary Timer */

@@ -1,7 +1,7 @@
 #include "hardwareSpecific.h"
 
 
-AVR_USART_t PrimaryUART = {
+volatile AVR_USART_t PrimaryUART = {
    &UCSR1A,
    &UCSR1B,
    &UCSR1C,
@@ -9,8 +9,8 @@ AVR_USART_t PrimaryUART = {
    &UBRR1L,
    &UDR1,
 
-   &TransmitBuffer,
-   &ReceiveBuffer
+   &ReceiveBuffer,
+   &TransmitBuffer
 };
 
 

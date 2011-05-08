@@ -34,7 +34,7 @@ THE SOFTWARE.
 #include "Profiles/profiles.h"
 #include "Menu/Menu.h"
 #include "MenuSettings.h"
-#include "SoftTimer/softtimer.h"
+#include "TimerCallbacks/TimerCallbacks.h"
 #include "SysEx.h"
 
 #include "hardUart/hardUart.h"
@@ -151,7 +151,7 @@ void ParseSysExData(uint8_t nextByte)
          if(  DataCount == ((sizeof(Profile_t)*2) + 3) )
          {
             uint8_t i;
-            char outputString[4];
+            char outputString[10];
             
               
             primaryMenu.MenuPrint_P( PSTR("Download Successful!"));
@@ -174,11 +174,12 @@ void ParseSysExData(uint8_t nextByte)
             /* Update the Retrigger periods */
             UpdateChannelRetriggers();
             
-      
-            for( i = 0; i < 5; i++ )
+            SoftTimerStart(SoftTimer1[SC_usbPoll]);
+            for( i = 0; i < 10; i++ )
          	{	
          		_delay_ms(200);
          	}
+            SoftTimerStop(SoftTimer1[SC_usbPoll]);
          	
          	/* To exit the Receive SysEx Sub-menu */
    	      SysExFlush(); 
@@ -215,7 +216,7 @@ void ParseSysExData(uint8_t nextByte)
 void SysEx_ReceiveError(uint8_t errorCode)
 {
    uint8_t i;
-   uint8_t outputString[3];
+   uint8_t outputString[10];
    
 
  
@@ -231,11 +232,13 @@ void SysEx_ReceiveError(uint8_t errorCode)
    SysExFlush();
    IsReceivingSysExData(SYSEX_DATA_ERROR);
    
-   for( i = 0; i < 5; i++ )
-	{	
-		_delay_ms(200);
-	}
-	
+   SoftTimerStart(SoftTimer1[SC_usbPoll]);
+   for( i = 0; i < 10; i++ )
+   {
+      _delay_ms(200);
+   }
+   SoftTimerStop(SoftTimer1[SC_usbPoll]);
+
 	/* To exit the Receive SysEx Sub-menu */
 	
 	Menu_UpOneLevel(&primaryMenu);
@@ -247,8 +250,9 @@ void SysExFlush(void)
 {
    DataCount = 0;
    IsReceivingSysExData(!RECEIVING_SYSEX_DATA);
+   SoftTimerStart(SoftTimer1[SC_MIDIScan]);
    ActiveProcess = DEFAULT_PROCESS;
-   SoftTimer_TimerInit();
+
 }
 
 
